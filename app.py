@@ -11,7 +11,7 @@ from datetime import datetime
 # ==========================================
 
 st.set_page_config(
-    page_title="Swiss Military Warehouse Material Planning",
+    page_title="Warehouse Material Planning",
     layout="wide"
 )
 
