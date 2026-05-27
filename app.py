@@ -252,7 +252,7 @@ if st.session_state.page == "home":
             <span style='color:red;'>
                 SM TRAVEL STORE
             </span>
-            MANAGEMENT PLANNING
+            PLANNING
         </h1>
         """,
         unsafe_allow_html=True
