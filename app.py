@@ -258,7 +258,7 @@ if st.session_state.page == "home":
         unsafe_allow_html=True
     )
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
 
@@ -294,6 +294,15 @@ if st.session_state.page == "home":
             use_container_width=True
         ):
             st.session_state.page = "dashboard"
+            st.rerun()
+
+    with col5:
+
+        if st.button(
+                "🔍 MATERIAL CHECK",
+                use_container_width=True
+        ):
+            st.session_state.page = "material_check"
             st.rerun()
 
 # ==========================================
@@ -841,6 +850,8 @@ elif st.session_state.page == "gate_out":
 
 elif st.session_state.page == "dashboard":
 
+
+
     # CACHE FIX DASHBOARD : every time the
     # user lands on dashboard, bust all caches
     # so KPIs and stock table always show the
@@ -864,6 +875,8 @@ elif st.session_state.page == "dashboard":
         st.rerun()
 
     st.divider()
+
+
 
     # ======================================
     # KPI
@@ -1037,3 +1050,175 @@ elif st.session_state.page == "dashboard":
         recent_out_df,
         use_container_width=True
     )
+
+# ==========================================
+# MATERIAL CHECK
+# ==========================================
+
+elif st.session_state.page == "material_check":
+
+    st.title("🔍 Material Rack Finder")
+
+    if st.button("⬅ Back To Home"):
+
+        st.session_state.page = "home"
+
+        st.rerun()
+
+    st.divider()
+
+    # ======================================
+    # MATERIAL LIST
+    # ======================================
+
+    material_list = (
+        po_items_df["MATERIAL"]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+    material_list.sort()
+
+    material_options = [
+        "Select Material"
+    ] + material_list
+
+    # ======================================
+    # DROPDOWN
+    # ======================================
+
+    selected_material = st.selectbox(
+        "🔍 Search Material",
+        material_options
+    )
+
+    # ======================================
+    # EMPTY SELECTION
+    # ======================================
+
+    if selected_material == "Select Material":
+
+        st.info(
+            "Select Material To View Rack Availability"
+        )
+
+    # ======================================
+    # SEARCH START
+    # ======================================
+
+    else:
+
+        # ==================================
+        # IN STOCK
+        # ==================================
+
+        material_in = po_items_df[
+            po_items_df["MATERIAL"]
+            ==
+            selected_material
+        ]
+
+        in_summary = material_in.groupby(
+            ["MATERIAL", "LOCATION"]
+        )["QTY"].sum().reset_index()
+
+        # ==================================
+        # OUT STOCK
+        # ==================================
+
+        material_out = gate_out_df[
+            gate_out_df["MATERIAL"]
+            ==
+            selected_material
+        ]
+
+        out_summary = material_out.groupby(
+            ["MATERIAL", "LOCATION"]
+        )["OUT_QTY"].sum().reset_index()
+
+        # ==================================
+        # MERGE
+        # ==================================
+
+        rack_df = pd.merge(
+            in_summary,
+            out_summary,
+            on=["MATERIAL", "LOCATION"],
+            how="left"
+        )
+
+        rack_df["OUT_QTY"] = (
+            rack_df["OUT_QTY"]
+            .fillna(0)
+        )
+
+        # ==================================
+        # BALANCE
+        # ==================================
+
+        rack_df["BALANCE"] = (
+            rack_df["QTY"]
+            -
+            rack_df["OUT_QTY"]
+        )
+
+        # ==================================
+        # REMOVE ZERO STOCK
+        # ==================================
+
+        rack_df = rack_df[
+            rack_df["BALANCE"] > 0
+        ]
+
+        # ==================================
+        # SORT
+        # ==================================
+
+        rack_df = rack_df.sort_values(
+            by="BALANCE",
+            ascending=False
+        )
+
+        # ==================================
+        # NO MATERIAL FOUND
+        # ==================================
+
+        if rack_df.empty:
+
+            st.error(
+                "No Stock Available ❌"
+            )
+
+        else:
+
+            # ==============================
+            # TOTAL STOCK
+            # ==============================
+
+            total_stock = rack_df[
+                "BALANCE"
+            ].sum()
+
+            st.success(
+                f"📦 Total Available Stock : {int(total_stock)}"
+            )
+
+            # ==============================
+            # DISPLAY
+            # ==============================
+
+            st.subheader(
+                "📍 Rack Availability"
+            )
+
+            st.dataframe(
+                rack_df[
+                    [
+                        "MATERIAL",
+                        "LOCATION",
+                        "BALANCE"
+                    ]
+                ],
+                use_container_width=True
+            )
