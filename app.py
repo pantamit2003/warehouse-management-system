@@ -11,7 +11,7 @@ from datetime import datetime
 # ==========================================
 
 st.set_page_config(
-    page_title="Warehouse Material Planning",
+    page_title="Swiss Military Warehouse Material Planning",
     layout="wide"
 )
 
@@ -250,9 +250,9 @@ if st.session_state.page == "home":
             margin-bottom:50px;
         '>
             <span style='color:red;'>
-                Swiss Military
+                SM TRAVEL STORE
             </span>
-            Warehouse Material Planning
+            MANAGEMENT PLANNING
         </h1>
         """,
         unsafe_allow_html=True
@@ -456,20 +456,80 @@ elif st.session_state.page == "gate_in":
     #   allocation just to read one value
     # ======================================
 
-    assigned_location = ""
+    # ======================================
+    # EXISTING LOCATION STOCK
+    # ======================================
+
+    selected_location = ""
 
     if selected_material != "Select Material":
 
-        match = location_master_df.loc[
-            location_master_df["MATERIAL"] == selected_material,
+        # CURRENT IN STOCK
+        material_in_df = po_items_df[
+            po_items_df["MATERIAL"] == selected_material
+            ]
+
+        in_summary = material_in_df.groupby(
             "LOCATION"
-        ]
+        )["QTY"].sum().reset_index()
 
-        if not match.empty:
-            assigned_location = match.iloc[0]
+        # CURRENT OUT STOCK
+        material_out_df = gate_out_df[
+            gate_out_df["MATERIAL"] == selected_material
+            ]
 
-            st.success(
-                f"📍 LOCATION : {assigned_location}"
+        out_summary = material_out_df.groupby(
+            "LOCATION"
+        )["OUT_QTY"].sum().reset_index()
+
+        # MERGE
+        location_stock_df = pd.merge(
+            in_summary,
+            out_summary,
+            on="LOCATION",
+            how="left"
+        )
+
+        location_stock_df["OUT_QTY"] = (
+            location_stock_df["OUT_QTY"]
+            .fillna(0)
+        )
+
+        location_stock_df["BALANCE"] = (
+                location_stock_df["QTY"]
+                -
+                location_stock_df["OUT_QTY"]
+        )
+
+        st.subheader("📍 Existing Locations")
+
+        st.dataframe(
+            location_stock_df[
+                ["LOCATION", "BALANCE"]
+            ],
+            use_container_width=True
+        )
+
+        # LOCATION OPTIONS
+        location_options = (
+            location_stock_df["LOCATION"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+
+        # NEW LOCATION OPTION
+        location_options.append("NEW LOCATION")
+
+        selected_location = st.selectbox(
+            "📍 Select Location",
+            location_options
+        )
+
+        # IF NEW LOCATION
+        if selected_location == "NEW LOCATION":
+            selected_location = st.text_input(
+                "Enter New Location"
             )
 
     qty = st.number_input(
@@ -498,7 +558,7 @@ elif st.session_state.page == "gate_in":
 
             st.session_state.po_items.append({
                 "material": selected_material,
-                "location": assigned_location,
+                "location": selected_location,
                 "qty": qty
             })
 
